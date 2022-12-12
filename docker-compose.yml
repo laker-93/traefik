@@ -1,0 +1,95 @@
+version: '3.4'
+services:
+  traefik:
+    image: 'traefik:2.9'
+    command:
+      - --api=true 
+      - --entryPoints.console.address=:8080         # ^ Defining port 8080 as "alias" called "console" - this port will be reachable from outside of Traefik container
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entryPoints.web.http.redirections.entryPoint.to=websecure
+      - --entryPoints.web.http.redirections.entrypoint.permanent=true
+
+      - --providers.docker=true
+      - --providers.docker.exposedByDefault=false
+
+      - --certificatesresolvers.le.acme.email=luke_purnell@hotmail.com
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.dnschallenge=true
+      - --certificatesresolvers.le.acme.dnschallenge.provider=cloudflare
+    container_name: 'traefik'
+    restart: 'unless-stopped'
+    ports:
+      - '443:443'
+      - '80:80'
+      - '8080:8080'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+        #- '/Users/lajp/traefik/acme.json:/acme.json'
+      - './letsencrypt:/letsencrypt'
+    environment:
+      - CF_API_EMAIL=<YOUR CF EMAIL HERE?
+      - CF_API_KEY=<YOUR CF TOKEN HERE>
+    labels:
+      - traefik.enable=true
+      - traefik.http.middlewares.admin.basicauth.users=admin:{SHA}/jIOs1SoLMVGd6FMOlt5mF6Ega0=  # * Generate SHA1 to protect access to the Web UI here: https://hostingcanada.org/htpasswd-generator - on this page I used: user/password = admin/greenfrog and got htpasswd: admin:{SHA}/jIOs1SoLMVGd6FMOlt5mF6Ega0=  (https://doc.traefik.io/traefik/middlewares/basicauth/). You can reuse this line multiple times under different containers to protect access to them.  
+
+                                                                                # Define route/router called "thisproxylocal"
+      - traefik.http.routers.thisproxylocal.rule=Host(`localhost`)            # * Change xxx.xxx.xxx.xxx to your Docker server IP
+      - traefik.http.routers.thisproxylocal.entryPoints=console                     # ^ Traefik WebUI is by default exposed on port 8080 so we have to redirect all requests to that port by creating entryPoint equal to "console" - alias that we defined several lines above.
+      - traefik.http.routers.thisproxylocal.service=api@internal                    # ^ Enable WebUI service on this specific router.
+      - traefik.http.routers.thisproxylocal.middlewares=admin                       # ^ Enabling authentication on this specific router.
+
+                                                                                # Define route/router called "thisproxytls"
+      - traefik.http.services.thisproxytls.loadbalancer.server.port=8080            # ^ Define loadBalancer port for WebUI
+      - traefik.http.routers.thisproxytls.rule=Host(`sub-box.net`)              # * Define URL that will be redirected to this container on port 8080 from https
+      - traefik.http.routers.thisproxytls.entrypoints=websecure                     # ^ Just because we defined redirection where any request from the Internet received on port 80 - http will be redirected to port 443 https we open websecure entrypoint as this is from where we will be receiving all the traffick anyway.
+      - traefik.http.routers.thisproxytls.service=api@internal                      # ^ Enable WebUI service on this specific router.
+      - traefik.http.routers.thisproxytls.middlewares=admin                         # ^ Enabling authentication on this specific router.
+      - traefik.http.routers.thisproxytls.tls.certresolver=le
+
+
+  navidrome:
+    image: deluan/navidrome:latest
+    restart: unless-stopped
+    container_name: "navidrome"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.navidrome.rule=Host(`navidrome.sub-box.net`) || PathPrefix(`/navidrome`)"
+      - "traefik.http.services.navidrome.loadbalancer.server.port=4533"
+      - "traefik.http.routers.navidrome.entrypoints=websecure"
+      - "traefik.http.routers.navidrome.tls.certresolver=le"
+    user: "501:20"
+    ports:
+      - "4533:4533"
+    environment:
+      ND_SCANSCHEDULE: 5m
+      ND_LOGLEVEL: info
+      ND_SESSIONTIMEOUT: 24h
+      # must add this so navidrome can respond to the path navidrome is to be accessed on via traefik
+      ND_BASEURL: /navidrome
+    volumes:
+      - "/Users/lajp/navidrome/data:/data"
+      - "/Users/lajp/Music:/music:ro"
+
+  slskd:
+    image: slskd/slskd
+    container_name: slskd
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.slskd.rule=Host(`slskd.sub-box.net`) || PathPrefix(`/slskd`)"
+      - "traefik.http.services.slskd.loadbalancer.server.port=5000"
+      - "traefik.http.routers.slskd.entrypoints=websecure"
+      - "traefik.http.routers.slskd.tls.certresolver=le"
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+      - "50000:50000"
+    volumes:
+      - "/Users/lajp/slskd/data/:/app"
+      - "/Users/lajp/Music/:/music"
+    environment:
+      SLSKD_SHARED_DIR: /music/Petter
+      SLSKD_URL_BASE: /slskd
+    restart: always
