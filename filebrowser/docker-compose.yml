@@ -7,8 +7,8 @@ services:
     ports:
       - 443:8080
     volumes:
-      - /Users/lukepurnell/workspace/filebrowser/data:/data
-      - /Users/lukepurnell/workspace/filebrowser/config:/config
+      - /Users/lajp/traefik/filebrowser/data:/data
+      - /Users/lajp/traefik/filebrowser/config:/config
     environment:
       - FB_BASEURL=/filebrowser
     restart: always

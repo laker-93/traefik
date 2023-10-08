@@ -1,0 +1,78 @@
+plugins: web
+directory: /music
+library: /config/musiclibrary.blb
+art_filename: albumart
+threaded: yes
+original_date: no
+per_disc_numbering: no
+
+convert:
+    auto: no
+    ffmpeg: /usr/bin/ffmpeg
+    opts: -ab 320k -ac 2 -ar 48000
+    max_bitrate: 320
+    threads: 1
+    
+# don't mind if tracks are missing from an album
+match:
+  distance_weights:
+    missing_tracks: 0
+
+paths:
+    default: $albumartist/$album%aunique{}/$track - $title
+    singleton: Non-Album/$artist - $title
+    comp: Compilations/$album%aunique{}/$track - $title
+    albumtype_soundtrack: Soundtracks/$album/$track $title 
+        
+import:
+    write: yes
+    # we copy so pymix can remove the import src dir when the
+    # process has completed successfully.
+    copy: yes
+    move: no
+    resume: ask
+    incremental: no
+    incremental_skip_later: no
+    # if duplicates found then merge them in. This can happen
+    # if tracks for a compilation are split over multiple
+    # directories. Then each time beets tries to import one of
+    # the directories it will think that it is importing a
+    # duplicate compilation album. This is acceptable since the
+    # tracks should be distinct so we just ask beets to merge.
+    duplicate_action: merge 
+    quiet_fallback: asis
+    timid: no
+    log: /config/beet.log
+
+      #lastgenre:
+      #    auto: yes
+      #    source: album
+
+embedart:
+    auto: yes
+
+fetchart:
+    auto: yes
+    
+replaygain:
+    auto: no
+
+scrub:
+    auto: yes
+
+replace:
+    '^\.': _
+    '[\x00-\x1f]': _
+    '[<>:"\?\*\|]': _
+    '[\xE8-\xEB]': e
+    '[\xEC-\xEF]': i
+    '[\xE2-\xE6]': a
+    '[\xF2-\xF6]': o
+    '[\xF8]': o
+    '\.$': _
+    '\s+$': ''
+
+web:
+    host: 0.0.0.0
+    port: 8337
+

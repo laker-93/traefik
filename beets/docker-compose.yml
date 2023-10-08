@@ -9,9 +9,9 @@ services:
       - PGID=1000
       - TZ=Etc/UTC
     volumes:
-      - /Users/lukepurnell/workspace/beets/config:/config
-      - /Users/lukepurnell/nav_music:/music
-      - /Users/lukepurnell/workspace/beets/download:/downloads
+      - /Users/lajp/traefik/beets/config:/config
+      - /Users/lajp/nav_music:/music
+      - /Users/lajp/traefik/beets/download:/downloads
     ports:
       - 8337:8337
     restart: unless-stopped

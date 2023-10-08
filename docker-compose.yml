@@ -18,6 +18,7 @@ services:
       - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.le.acme.dnschallenge=true
       - --certificatesresolvers.le.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.le.acme.dnschallenge.disablepropagationcheck=true
     container_name: 'traefik'
     restart: 'unless-stopped'
     ports:
@@ -29,8 +30,9 @@ services:
         #- '/Users/lajp/traefik/acme.json:/acme.json'
       - './letsencrypt:/letsencrypt'
     environment:
-      - CF_API_EMAIL=<YOUR CF EMAIL HERE?
-      - CF_API_KEY=<YOUR CF TOKEN HERE>
+      - CF_API_EMAIL=luke_purnell@hotmail.com
+      - CF_DNS_API_TOKEN=rfnkbaaHXPMgtukzZyjjJ9HS7-YrHkFRn_T8HXhV
+        # - CF_API_KEY=016bce37031db2d76ce8f6e8866ddf5501c32
     labels:
       - traefik.enable=true
       - traefik.http.middlewares.admin.basicauth.users=admin:{SHA}/jIOs1SoLMVGd6FMOlt5mF6Ega0=  # * Generate SHA1 to protect access to the Web UI here: https://hostingcanada.org/htpasswd-generator - on this page I used: user/password = admin/greenfrog and got htpasswd: admin:{SHA}/jIOs1SoLMVGd6FMOlt5mF6Ega0=  (https://doc.traefik.io/traefik/middlewares/basicauth/). You can reuse this line multiple times under different containers to protect access to them.  
@@ -51,7 +53,7 @@ services:
 
 
   navidrome:
-    image: deluan/navidrome:latest
+    image: laker93/neodrome:latest
     restart: unless-stopped
     container_name: "navidrome"
     labels:
@@ -70,8 +72,8 @@ services:
       # must add this so navidrome can respond to the path navidrome is to be accessed on via traefik
       ND_BASEURL: /navidrome
     volumes:
-      - "/Users/lajp/navidrome/data:/data"
-      - "/Users/lajp/Music:/music:ro"
+      - "/Users/lajp/traefik/navidrome/data:/data"
+      - "/Users/lajp/nav_music:/music:ro"
 
   slskd:
     image: slskd/slskd
