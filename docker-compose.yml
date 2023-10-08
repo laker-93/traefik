@@ -31,8 +31,7 @@ services:
       - './letsencrypt:/letsencrypt'
     environment:
       - CF_API_EMAIL=luke_purnell@hotmail.com
-      - CF_DNS_API_TOKEN=rfnkbaaHXPMgtukzZyjjJ9HS7-YrHkFRn_T8HXhV
-        # - CF_API_KEY=016bce37031db2d76ce8f6e8866ddf5501c32
+      - CF_DNS_API_TOKEN=<DNS-API-KEY-WITH-DNS-EDIT-PERMISSIONS>
     labels:
       - traefik.enable=true
       - traefik.http.middlewares.admin.basicauth.users=admin:{SHA}/jIOs1SoLMVGd6FMOlt5mF6Ega0=  # * Generate SHA1 to protect access to the Web UI here: https://hostingcanada.org/htpasswd-generator - on this page I used: user/password = admin/greenfrog and got htpasswd: admin:{SHA}/jIOs1SoLMVGd6FMOlt5mF6Ega0=  (https://doc.traefik.io/traefik/middlewares/basicauth/). You can reuse this line multiple times under different containers to protect access to them.  
