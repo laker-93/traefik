@@ -2,19 +2,29 @@ plugins: web
 directory: /music
 library: /config/musiclibrary.blb
 art_filename: albumart
-threaded: yes
+threaded: no
 original_date: no
 per_disc_numbering: no
 
-convert:
-    auto: no
-    ffmpeg: /usr/bin/ffmpeg
-    opts: -ab 320k -ac 2 -ar 48000
-    max_bitrate: 320
-    threads: 1
+  #convert:
+  #    auto: no
+  #    ffmpeg: /usr/bin/ffmpeg
+  #    opts: -ab 320k -ac 2 -ar 48000
+  #    max_bitrate: 320
+  #    threads: 1
     
-# don't mind if tracks are missing from an album
 match:
+  # want to accept a match automatically if it is greater than
+  # 80%.
+  # in order to do that must make beets ignore certain
+  # attributes to prevent it downgrading from a strong rec and
+  # therefore not accepting a match in quiet mode.
+  max_rec:
+    missing_tracks: strong
+    unmatched_tracks: strong
+  ignored: missing_tracks
+  strong_rec_thresh: 0.20
+  # don't mind if tracks are missing from an album
   distance_weights:
     missing_tracks: 0
 
