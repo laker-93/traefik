@@ -7,6 +7,8 @@ services:
       - --entryPoints.console.address=:8080         # ^ Defining port 8080 as "alias" called "console" - this port will be reachable from outside of Traefik container
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http3
+      - --experimental.http3=true
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entryPoints.web.http.redirections.entryPoint.to=websecure
       - --entryPoints.web.http.redirections.entrypoint.permanent=true
@@ -22,7 +24,8 @@ services:
     container_name: 'traefik'
     restart: 'unless-stopped'
     ports:
-      - '443:443'
+      - '443:443/tcp'
+      - '443:443/udp'
       - '80:80'
       - '8080:8080'
     volumes:
@@ -44,35 +47,60 @@ services:
 
                                                                                 # Define route/router called "thisproxytls"
       - traefik.http.services.thisproxytls.loadbalancer.server.port=8080            # ^ Define loadBalancer port for WebUI
-      - traefik.http.routers.thisproxytls.rule=Host(`sub-box.net`)              # * Define URL that will be redirected to this container on port 8080 from https
+      - traefik.http.routers.thisproxytls.rule=Host(`home.sub-box.net`)              # * Define URL that will be redirected to this container on port 8080 from https
       - traefik.http.routers.thisproxytls.entrypoints=websecure                     # ^ Just because we defined redirection where any request from the Internet received on port 80 - http will be redirected to port 443 https we open websecure entrypoint as this is from where we will be receiving all the traffick anyway.
       - traefik.http.routers.thisproxytls.service=api@internal                      # ^ Enable WebUI service on this specific router.
       - traefik.http.routers.thisproxytls.middlewares=admin                         # ^ Enabling authentication on this specific router.
       - traefik.http.routers.thisproxytls.tls.certresolver=le
+      - "traefik.http.middlewares.cors.headers.accesscontrolallowmethods=*"
+      - "traefik.http.middlewares.cors.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.cors.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.cors.headers.accesscontrolmaxage=100"
+      - "traefik.http.middlewares.cors.headers.addvaryheader=true"
 
 
-  navidrome:
-    image: laker93/neodrome:latest
+  player:
+    image: laker93/feishin:latest
     restart: unless-stopped
-    container_name: "navidrome"
+    container_name: "player"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.navidrome.rule=Host(`navidrome.sub-box.net`) || PathPrefix(`/navidrome`)"
-      - "traefik.http.services.navidrome.loadbalancer.server.port=4533"
-      - "traefik.http.routers.navidrome.entrypoints=websecure"
-      - "traefik.http.routers.navidrome.tls.certresolver=le"
+      - "traefik.http.routers.player.rule=Host(`player.sub-box.net`) || PathPrefix(`/player`)"
+      - "traefik.http.services.player.loadbalancer.server.port=9180"
+      - "traefik.http.routers.player.entrypoints=websecure"
+      - "traefik.http.routers.player.tls.certresolver=le"
+      - "traefik.http.middlewares.cors.headers.accesscontrolallowmethods=*"
+      - "traefik.http.middlewares.cors.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.cors.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.cors.headers.accesscontrolmaxage=100"
+      - "traefik.http.middlewares.cors.headers.addvaryheader=true"
+    #user: "501:20"
+    ports:
+      - 9180:9180
+    environment:
+      # must add this so player can respond to the path player is to be accessed on via traefik
+      - PUBLIC_PATH="/player"
+
+  browser:
+    image: hurlenko/filebrowser
+    container_name: filebrowser
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.browser.rule=Host(`browser.sub-box.net`) || PathPrefix(`/browser`)"
+      - "traefik.http.services.browser.loadbalancer.server.port=8080"
+      - "traefik.http.routers.browser.entrypoints=websecure"
+      - "traefik.http.routers.browser.tls.certresolver=le"
     user: "501:20"
     ports:
-      - "4533:4533"
-    environment:
-      ND_SCANSCHEDULE: 5m
-      ND_LOGLEVEL: info
-      ND_SESSIONTIMEOUT: 24h
-      # must add this so navidrome can respond to the path navidrome is to be accessed on via traefik
-      ND_BASEURL: /navidrome
+      - 8081:8080
     volumes:
-      - "/Users/lajp/traefik/navidrome/data:/data"
-      - "/Users/lajp/nav_music:/music:ro"
+      - /Users/lajp/subbox/docker-compose/filebrowser/data:/data
+      - /Users/lajp/subbox/docker-compose/filebrowser/config:/config
+    environment:
+      - FB_BASEURL=/browser
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   slskd:
     image: slskd/slskd
@@ -88,9 +116,38 @@ services:
       - "5001:5001"
       - "50000:50000"
     volumes:
-      - "/Users/lajp/slskd/data/:/app"
-      - "/Users/lajp/Music/:/music"
+      - "/Users/lajp/traefik/slskd/data/:/app"
+      - "/Users/lajp/traefik/slskd/music/:/music"
     environment:
       SLSKD_SHARED_DIR: /music/Petter
       SLSKD_URL_BASE: /slskd
+      SLSKD_HTTP_PORT: 5000
+      SLSKD_HTTPS_PORT: 5001
+      SLSKD_SLSK_LISTEN_PORT: 50000
     restart: always
+
+  subbox:
+    image: laker93/subbox-landing
+    restart: unless-stopped
+    container_name: subbox
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.subbox.rule=Host(`sub-box.net`) || PathPrefix(`/`)"
+
+      - "traefik.http.services.subbox.loadbalancer.server.port=8888"
+      - "traefik.http.routers.subbox.entrypoints=websecure"
+      - "traefik.http.routers.subbox.tls.certresolver=le"
+    ports:
+      - 8888:8888
+
+  pymix:
+    image: laker93/pymix
+    privileged: true
+    restart: unless-stopped
+    container_name: pymix
+    ports:
+      - 8002:8002
+    volumes:
+      - ./db:/pymix/db
+      - /Users/lajp/subbox:/subbox
+      - /var/run/docker.sock:/var/run/docker.sock
