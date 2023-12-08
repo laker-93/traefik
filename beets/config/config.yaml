@@ -73,16 +73,16 @@ scrub:
 replace:
     '^\.': _
     '[\x00-\x1f]': _
-    '[<>:"\?\*\|]': _
+    #'[<>:"\?\*\|]': _
     '[\xE8-\xEB]': e
     '[\xEC-\xEF]': i
     '[\xE2-\xE6]': a
     '[\xF2-\xF6]': o
     '[\xF8]': o
-    '\.$': _
     '\s+$': ''
 
 web:
+    readonly: false
     host: 0.0.0.0
     port: 8337
 
