@@ -94,7 +94,7 @@ services:
     ports:
       - 8081:8080
     volumes:
-      - /Users/lajp/subbox/docker-compose/filebrowser/data:/data
+      - fb-data:/data
       - /Users/lajp/subbox/docker-compose/filebrowser/config:/config
     environment:
       - FB_BASEURL=/browser
@@ -150,4 +150,9 @@ services:
     volumes:
       - ./db:/pymix/db
       - /Users/lajp/subbox:/subbox
+      - fb-data:/fb-data
       - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  fb-data:
+    driver: local
