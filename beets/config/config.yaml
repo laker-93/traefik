@@ -1,4 +1,4 @@
-plugins: web
+plugins: web fromfilename
 directory: /music
 library: /config/musiclibrary.blb
 art_filename: albumart

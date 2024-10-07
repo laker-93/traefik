@@ -1,7 +1,7 @@
 version: '3.4'
 services:
   traefik:
-    image: 'traefik:2.9'
+    image: 'traefik:2.11'
     command:
       - --api=true 
       - --entryPoints.console.address=:8080         # ^ Defining port 8080 as "alias" called "console" - this port will be reachable from outside of Traefik container
@@ -14,6 +14,7 @@ services:
       - --entryPoints.web.http.redirections.entrypoint.permanent=true
 
       - --providers.docker=true
+      - --providers.docker.network=proxy
       - --providers.docker.exposedByDefault=false
 
       - --certificatesresolvers.le.acme.email=luke_purnell@hotmail.com
@@ -34,12 +35,12 @@ services:
       - './letsencrypt:/letsencrypt'
     environment:
       - CF_API_EMAIL=luke_purnell@hotmail.com
-      - CF_DNS_API_TOKEN=<DNS-API-KEY-WITH-DNS-EDIT-PERMISSIONS>
+      # - CF_API_KEY=016bce37031db2d76ce8f6e8866ddf5501c32
+      - CF_DNS_API_TOKEN=Ecl-c3b1QECgoZ7ElFwd78-Gj7LdgjT830eiMt1d
     labels:
       - traefik.enable=true
       - traefik.http.middlewares.admin.basicauth.users=admin:{SHA}/jIOs1SoLMVGd6FMOlt5mF6Ega0=  # * Generate SHA1 to protect access to the Web UI here: https://hostingcanada.org/htpasswd-generator - on this page I used: user/password = admin/greenfrog and got htpasswd: admin:{SHA}/jIOs1SoLMVGd6FMOlt5mF6Ega0=  (https://doc.traefik.io/traefik/middlewares/basicauth/). You can reuse this line multiple times under different containers to protect access to them.  
 
-                                                                                # Define route/router called "thisproxylocal"
       - traefik.http.routers.thisproxylocal.rule=Host(`localhost`)            # * Change xxx.xxx.xxx.xxx to your Docker server IP
       - traefik.http.routers.thisproxylocal.entryPoints=console                     # ^ Traefik WebUI is by default exposed on port 8080 so we have to redirect all requests to that port by creating entryPoint equal to "console" - alias that we defined several lines above.
       - traefik.http.routers.thisproxylocal.service=api@internal                    # ^ Enable WebUI service on this specific router.
@@ -60,7 +61,7 @@ services:
 
 
   player:
-    image: laker93/feishin:latest
+    image: laker93/player:v2
     restart: unless-stopped
     container_name: "player"
     labels:
@@ -90,11 +91,18 @@ services:
       - "traefik.http.services.browser.loadbalancer.server.port=8080"
       - "traefik.http.routers.browser.entrypoints=websecure"
       - "traefik.http.routers.browser.tls.certresolver=le"
-    user: "501:20"
+      - "traefik.http.routers.browser.middlewares=cors"
+      - "traefik.http.middlewares.cors.headers.accesscontrolallowmethods=*"
+      - "traefik.http.middlewares.cors.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.cors.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.cors.headers.accesscontrolmaxage=100"
+      - "traefik.http.middlewares.cors.headers.addvaryheader=true"
+
+    user: root
     ports:
       - 8081:8080
     volumes:
-      - fb-data:/data
+      - user-updownloads:/data/users:z
       - /Users/lajp/subbox/docker-compose/filebrowser/config:/config
     environment:
       - FB_BASEURL=/browser
@@ -117,6 +125,12 @@ services:
       - "50000:50000"
     volumes:
       - "/Users/lajp/traefik/slskd/data/:/app"
+      - type: volume
+        source: user-updownloads
+        target: /app
+        volume:
+          nocopy: true
+          subpath: laker93/downloads
       - "/Users/lajp/traefik/slskd/music/:/music"
     environment:
       SLSKD_SHARED_DIR: /music/Petter
@@ -127,32 +141,61 @@ services:
     restart: always
 
   subbox:
-    image: laker93/subbox-landing
+    image: laker93/subbox-landing:latest
     restart: unless-stopped
     container_name: subbox
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.subbox.rule=Host(`sub-box.net`) || PathPrefix(`/`)"
-
-      - "traefik.http.services.subbox.loadbalancer.server.port=8888"
-      - "traefik.http.routers.subbox.entrypoints=websecure"
-      - "traefik.http.routers.subbox.tls.certresolver=le"
+      traefik.enable: "true"
+      traefik.http.routers.subbox.rule: Host(`sub-box.net`, `www.sub-box.net`)
+      traefik.http.services.subbox.loadbalancer.server.port: 8888
+      traefik.http.routers.subbox.entrypoints: websecure
+      traefik.http.routers.subbox.tls.certresolver: le
+      traefik.http.routers.subbox.middlewares: redirect-non-www-to-www
+      traefik.http.middlewares.redirect-non-www-to-www.redirectregex.permanent: true
+      traefik.http.middlewares.redirect-non-www-to-www.redirectregex.regex: "^https?://(?:www\\.)?(.+)"
+      traefik.http.middlewares.redirect-non-www-to-www.redirectregex.replacement: "https://www.$${1}"
     ports:
       - 8888:8888
+    environment:
+      - APP_ENVIRONMENT=prod
 
   pymix:
-    image: laker93/pymix
+    image: laker93/pymix:latest
     privileged: true
     restart: unless-stopped
     container_name: pymix
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pymix.rule=Host(`pymix.sub-box.net`) || PathPrefix(`/pymix`)"
+      - "traefik.http.services.pymix.loadbalancer.server.port=5000"
+      - "traefik.http.routers.pymix.entrypoints=websecure"
+      - "traefik.http.routers.pymix.tls.certresolver=le"
     ports:
       - 8002:8002
     volumes:
       - ./db:/pymix/db
+      - user-updownloads:/user-updownloads
+      - private-music:/private-music
+      - private-staged:/private-staged
+      - public-staged:/public-staged
       - /Users/lajp/subbox:/subbox
-      - fb-data:/fb-data
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - APP_ENVIRONMENT=prod
 
 volumes:
-  fb-data:
+  user-updownloads:
     driver: local
+    name: user-updownloads
+  private-staged:
+    driver: local
+    name: private-staged
+  private-music:
+    driver: local
+    name: private-music
+  public-music:
+    driver: local
+    name: public-music
+  public-staged:
+    driver: local
+    name: public-staged
